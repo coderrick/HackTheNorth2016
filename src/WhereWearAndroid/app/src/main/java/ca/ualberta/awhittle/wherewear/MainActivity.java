@@ -11,11 +11,18 @@ import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
+import android.webkit.JavascriptInterface;
+import android.webkit.WebView;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.TextView;
 
 // Location code based off of https://developer.android.com/guide/topics/location/strategies.html
+
+class JsObject {
+    @JavascriptInterface
+    public String toString() { return "injectedObject"; }
+}
 
 public class MainActivity extends AppCompatActivity {
 
@@ -24,7 +31,10 @@ public class MainActivity extends AppCompatActivity {
     private TextView locTextView;
     private EditText destTextView;
     private Button goButton;
+    private WebView webView;
     private String destination;
+    private Location oldLocation;
+    private final float DELTA_DIST = 10.0f;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -33,6 +43,26 @@ public class MainActivity extends AppCompatActivity {
 
         locTextView = (TextView) findViewById(R.id.locText);
         destTextView = (EditText) findViewById(R.id.destText);
+        webView = (WebView) findViewById(R.id.mainWebView);
+        webView.getSettings().setJavaScriptEnabled(true);
+        // http://stackoverflow.com/questions/19739269/gl-error-from-openglrenderer-0x502
+        webView.setLayerType(View.LAYER_TYPE_SOFTWARE, null);
+
+        // http://stackoverflow.com/questions/32163517/run-javascript-code-in-webview/32163655#32163655
+        //if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.KITKAT) {
+            Log.d(tag, "onCreate: Webview Init");
+            if(webView.requestFocus()) {
+                webView.addJavascriptInterface(new JsObject(), "injectedObject");
+                webView.loadData("", "text/html", null);
+                webView.loadUrl("javascript:alert(injectedObject.toString())");
+
+                //webView.evaluateJavascript("javascript:alert(injectedObject.toString())",null);
+        //    } else {
+        //        Log.e(tag, "onCreate: No focus on webview");
+            }
+        //} else {
+        //    Log.e(tag, "onCreate: Build version too old");
+        //}
 
         goButton = (Button)findViewById(R.id.buttonGo);
         goButton.setOnClickListener(new View.OnClickListener() {
@@ -42,6 +72,8 @@ public class MainActivity extends AppCompatActivity {
                 //TODO: Use location
             }
         });
+
+        oldLocation = new Location("nullProvider"); // 0,0
 
         // Acquire a reference to the system Location Manager
         LocationManager locationManager = (LocationManager) this.getSystemService(Context.LOCATION_SERVICE);
@@ -74,10 +106,17 @@ public class MainActivity extends AppCompatActivity {
         locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 0, 0, locationListener);
     }
 
-    private void makeUseOfNewLocation(Location location) {
-        String s = "Latitude: " + location.getLatitude() + "\n" +
-                "Longitude: " + location.getLongitude();
+    private void makeUseOfNewLocation(Location newLocation) {
+        String s = "Latitude: " + newLocation.getLatitude() + "\n" +
+                "Longitude: " + newLocation.getLongitude();
         locTextView.setText(s);
+
+        if(newLocation.distanceTo(oldLocation) > DELTA_DIST){
+            oldLocation = newLocation;
+
+
+
+        }
     }
 
     @Override
